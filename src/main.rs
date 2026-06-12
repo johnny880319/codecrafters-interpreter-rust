@@ -1,6 +1,8 @@
 use std::env;
 use std::fs;
 
+mod scanning;
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 3 {
@@ -20,11 +22,11 @@ fn main() {
                 String::new()
             });
 
-            if !file_contents.is_empty() {
-                panic!("Scanner not implemented");
-            } else {
-                println!("EOF  null");
-            }
+            let tokens = scanning::scan_tokens(&file_contents).unwrap_or_else(|err| {
+                eprintln!("Error scanning tokens: {}", err);
+                Vec::new()
+            });
+            scanning::print_tokens(&tokens);
         }
         _ => {
             eprintln!("Unknown command: {}", command);
