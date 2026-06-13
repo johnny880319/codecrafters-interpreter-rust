@@ -65,33 +65,18 @@ impl Scanner<'_> {
 
         match c {
             ',' | '.' | '-' | '+' | ';' | '*' | '(' | ')' | '{' | '}' => {
-                self.scan_single_character_token()
+                self.scan_single_character_token(c)?;
             }
-            '=' | '!' | '<' | '>' => self.scan_equal_operator(),
-            '/' => self.scan_slash(),
-            '"' => self.scan_string(),
-            ' ' | '\t' => {
-                self.offset += 1;
-                Ok(())
-            }
-            '\n' => {
-                self.line += 1;
-                self.offset += 1;
-                Ok(())
-            }
-            _ => {
-                self.errors.push(ScanError {
-                    line: self.line,
-                    message: format!("Unexpected character: {c}"),
-                });
-                self.offset += 1;
-                Ok(())
-            }
+            '=' | '!' | '<' | '>' => self.scan_equal_operator(c)?,
+            ' ' | '\t' | '\n' => self.scan_space(c),
+            '"' => self.scan_string(c),
+            '/' => self.scan_slash(c),
+            _ => self.unexpected_character(c),
         }
+        Ok(())
     }
 
-    fn scan_single_character_token(&mut self) -> Result<()> {
-        let c = self.source.as_bytes()[self.offset] as char;
+    fn scan_single_character_token(&mut self, c: char) -> Result<()> {
         let token_type = match c {
             ',' => "COMMA",
             '.' => "DOT",
@@ -117,8 +102,7 @@ impl Scanner<'_> {
         Ok(())
     }
 
-    fn scan_equal_operator(&mut self) -> Result<()> {
-        let c = self.source.as_bytes()[self.offset] as char;
+    fn scan_equal_operator(&mut self, c: char) -> Result<()> {
         let mut lexeme = c.to_string();
 
         let mut token_type = match c {
@@ -145,38 +129,14 @@ impl Scanner<'_> {
         Ok(())
     }
 
-    fn scan_slash(&mut self) -> Result<()> {
-        if self.offset >= self.source.len() || self.source.as_bytes()[self.offset] as char != '/' {
-            return Err(anyhow::anyhow!("Expected '/' at offset {}", self.offset,));
-        }
-        if self.offset + 1 < self.source.len()
-            && self.source.as_bytes()[self.offset + 1] as char == '/'
-        {
-            // find newline or end of file
-            let mut new_offset = self.offset + 2;
-            while new_offset < self.source.len()
-                && self.source.as_bytes()[new_offset] as char != '\n'
-            {
-                new_offset += 1;
-            }
-            self.offset = new_offset;
-            return Ok(());
-        }
-
+    const fn scan_space(&mut self, c: char) {
         self.offset += 1;
-        self.tokens.push(Token {
-            kind: "SLASH".to_string(),
-            lexeme: "/".to_string(),
-            literal: None,
-        });
-        Ok(())
+        if c == '\n' {
+            self.line += 1;
+        }
     }
 
-    fn scan_string(&mut self) -> Result<()> {
-        if self.offset >= self.source.len() || self.source.as_bytes()[self.offset] as char != '"' {
-            return Err(anyhow::anyhow!("Expected '\"' at offset {}", self.offset,));
-        }
-
+    fn scan_string(&mut self, _: char) {
         self.offset += 1;
         let start_offset = self.offset;
         while self.offset < self.source.len() && self.source.as_bytes()[self.offset] as char != '"'
@@ -189,7 +149,7 @@ impl Scanner<'_> {
                 line: self.line,
                 message: "Unterminated string.".to_string(),
             });
-            return Ok(());
+            return;
         }
 
         self.tokens.push(Token {
@@ -199,7 +159,36 @@ impl Scanner<'_> {
         });
 
         self.offset += 1;
+    }
 
-        Ok(())
+    fn scan_slash(&mut self, _: char) {
+        if self.offset + 1 < self.source.len()
+            && self.source.as_bytes()[self.offset + 1] as char == '/'
+        {
+            // find newline or end of file
+            let mut new_offset = self.offset + 2;
+            while new_offset < self.source.len()
+                && self.source.as_bytes()[new_offset] as char != '\n'
+            {
+                new_offset += 1;
+            }
+            self.offset = new_offset;
+            return;
+        }
+
+        self.offset += 1;
+        self.tokens.push(Token {
+            kind: "SLASH".to_string(),
+            lexeme: "/".to_string(),
+            literal: None,
+        });
+    }
+
+    fn unexpected_character(&mut self, c: char) {
+        self.errors.push(ScanError {
+            line: self.line,
+            message: format!("Unexpected character: {c}"),
+        });
+        self.offset += 1;
     }
 }
