@@ -16,28 +16,32 @@ pub fn scan_tokens(source: &str) -> Result<(Vec<Token>, Vec<ScanError>)> {
     let mut errors = Vec::new();
     let line = 1;
 
-    let mut head = 0;
-    while head < source.len() {
-        let c = source.as_bytes()[head] as char;
+    let mut offset = 0;
+    while offset < source.len() {
+        let c = source.as_bytes()[offset] as char;
 
-        let (token_type, tail) = match c {
-            ',' | '.' | '-' | '+' | ';' | '/' | '*' | '(' | ')' | '{' | '}' => {
-                scan_single_character_token(source, head)?
+        let (token_type, lexeme, new_offset) = match c {
+            ',' | '.' | '-' | '+' | ';' | '*' | '(' | ')' | '{' | '}' => {
+                scan_single_character_token(source, offset)?
             }
-            '=' | '!' | '<' | '>' => scan_equal_operator(source, head)?,
+            '=' | '!' | '<' | '>' => scan_equal_operator(source, offset)?,
+            '/' => scan_slash(source, offset)?,
             _ => {
                 errors.push(ScanError { line, character: c });
-                head += 1;
+                offset += 1;
                 continue;
             }
         };
 
+        if lexeme.is_empty() {
+            break;
+        }
         tokens.push(Token {
             kind: token_type,
-            lexeme: source[head..tail].to_string(),
+            lexeme,
             literal: None,
         });
-        head = tail;
+        offset = new_offset;
     }
 
     tokens.push(Token {
@@ -65,7 +69,7 @@ pub fn print_tokens(tokens: &[Token], errors: &[ScanError]) {
     }
 }
 
-fn scan_single_character_token(source: &str, offset: usize) -> Result<(String, usize)> {
+fn scan_single_character_token(source: &str, offset: usize) -> Result<(String, String, usize)> {
     let c = source.as_bytes()[offset] as char;
     let token_type = match c {
         ',' => "COMMA",
@@ -73,7 +77,6 @@ fn scan_single_character_token(source: &str, offset: usize) -> Result<(String, u
         '-' => "MINUS",
         '+' => "PLUS",
         ';' => "SEMICOLON",
-        '/' => "SLASH",
         '*' => "STAR",
         '(' => "LEFT_PAREN",
         ')' => "RIGHT_PAREN",
@@ -82,10 +85,10 @@ fn scan_single_character_token(source: &str, offset: usize) -> Result<(String, u
         _ => return Err(anyhow::anyhow!("Unexpected character: {}", c)),
     }
     .to_owned();
-    Ok((token_type, offset + 1))
+    Ok((token_type, c.to_string(), offset + 1))
 }
 
-fn scan_equal_operator(source: &str, mut offset: usize) -> Result<(String, usize)> {
+fn scan_equal_operator(source: &str, mut offset: usize) -> Result<(String, String, usize)> {
     let c = source.as_bytes()[offset] as char;
     let mut lexeme = c.to_string();
 
@@ -104,5 +107,15 @@ fn scan_equal_operator(source: &str, mut offset: usize) -> Result<(String, usize
         lexeme += "=";
         token_type += "_EQUAL";
     }
-    Ok((token_type, offset))
+    Ok((token_type, lexeme, offset))
+}
+
+fn scan_slash(source: &str, offset: usize) -> Result<(String, String, usize)> {
+    if offset >= source.len() || source.as_bytes()[offset] as char != '/' {
+        return Err(anyhow::anyhow!("Expected '/' at offset {}", offset,));
+    }
+    if offset + 1 < source.len() && source.as_bytes()[offset + 1] as char == '/' {
+        return Ok((String::new(), String::new(), source.len()));
+    }
+    Ok(("SLASH".to_string(), "/".to_string(), offset + 1))
 }
