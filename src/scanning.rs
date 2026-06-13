@@ -40,8 +40,18 @@ pub fn scan_tokens(source: &str) -> (Vec<Token>, Vec<ScanError>) {
                     "EQUAL"
                 }
             }
+            '!' => {
+                if offset + 1 < source.len() && source.as_bytes()[offset + 1] as char == '=' {
+                    offset += 1;
+                    lexeme = "!=".to_string();
+                    "BANG_EQUAL"
+                } else {
+                    "BANG"
+                }
+            }
             '\n' => {
                 line += 1;
+                offset += 1;
                 continue;
             }
             _ => {
