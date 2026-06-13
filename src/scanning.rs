@@ -69,6 +69,7 @@ impl Scanner<'_> {
             }
             '=' | '!' | '<' | '>' => self.scan_equal_operator(),
             '/' => self.scan_slash(),
+            '"' => self.scan_string(),
             ' ' | '\t' => {
                 self.offset += 1;
                 Ok(())
@@ -170,33 +171,35 @@ impl Scanner<'_> {
         });
         Ok(())
     }
+
+    fn scan_string(&mut self) -> Result<()> {
+        if self.offset >= self.source.len() || self.source.as_bytes()[self.offset] as char != '"' {
+            return Err(anyhow::anyhow!("Expected '\"' at offset {}", self.offset,));
+        }
+
+        self.offset += 1;
+        let start_offset = self.offset;
+        while self.offset < self.source.len() && self.source.as_bytes()[self.offset] as char != '"'
+        {
+            self.offset += 1;
+        }
+
+        if self.offset >= self.source.len() {
+            self.errors.push(ScanError {
+                line: self.line,
+                message: "Unterminated string.".to_string(),
+            });
+            return Ok(());
+        }
+
+        self.tokens.push(Token {
+            kind: "STRING".to_string(),
+            lexeme: self.source[(start_offset - 1)..=self.offset].to_string(),
+            literal: Some(self.source[start_offset..self.offset].to_string()),
+        });
+
+        self.offset += 1;
+
+        Ok(())
+    }
 }
-
-// fn scan_string(
-//     source: &str,
-//     mut offset: usize,
-//     errors: &mut Vec<ScanError>,
-// ) -> Result<(Token, usize)> {
-//     if offset >= source.len() || source.as_bytes()[offset] as char != '"' {
-//         return Err(anyhow::anyhow!("Expected '\"' at offset {}", offset,));
-//     }
-
-//     offset += 1;
-//     let start_offset = offset;
-//     while offset < source.len() && source.as_bytes()[offset] as char != '"' {
-//         offset += 1;
-//     }
-
-//     if offset >= source.len() {
-//         errors.push(ScanError {
-//             line:
-
-//     return Ok((
-//         Token {
-//             kind: "STRING".to_string(),
-//             lexeme: source[start_offset - 1..offset + 1].to_string(),
-//             literal: Some(source[start_offset..offset].to_string()),
-//         },
-//         offset + 1,
-//     ));
-// }}
