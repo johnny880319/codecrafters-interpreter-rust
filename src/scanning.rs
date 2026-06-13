@@ -119,7 +119,12 @@ fn scan_slash(source: &str, offset: usize) -> Result<(String, String, usize)> {
         return Err(anyhow::anyhow!("Expected '/' at offset {}", offset,));
     }
     if offset + 1 < source.len() && source.as_bytes()[offset + 1] as char == '/' {
-        return Ok((String::new(), String::new(), source.len()));
+        // find newline or end of file
+        let mut new_offset = offset + 2;
+        while new_offset < source.len() && source.as_bytes()[new_offset] as char != '\n' {
+            new_offset += 1;
+        }
+        return Ok((String::new(), String::new(), new_offset));
     }
     Ok(("SLASH".to_string(), "/".to_string(), offset + 1))
 }
