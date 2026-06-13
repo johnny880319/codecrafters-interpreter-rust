@@ -1,3 +1,4 @@
+use crate::scanning::Scanner;
 use std::env;
 use std::fs;
 
@@ -22,13 +23,13 @@ fn main() {
                 String::new()
             });
 
-            let (tokens, errors) = scanning::scan_tokens(&file_contents).unwrap_or_else(|_| {
-                eprint!("Failed to scan tokens from file {filename}");
-                (Vec::new(), Vec::new())
+            let mut scanner = Scanner::new(&file_contents);
+            scanner.scan_tokens().unwrap_or_else(|_| {
+                eprintln!("Failed to scan tokens from file {filename}");
             });
-            scanning::print_tokens(&tokens, &errors);
+            scanner.print();
 
-            if !errors.is_empty() {
+            if scanner.has_errors() {
                 std::process::exit(65);
             }
         }

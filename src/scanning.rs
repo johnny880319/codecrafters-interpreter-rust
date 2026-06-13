@@ -1,130 +1,202 @@
 use anyhow::Result;
 
-pub struct Token {
+pub struct Scanner<'a> {
+    source: &'a str,
+    line: usize,
+    offset: usize,
+    tokens: Vec<Token>,
+    errors: Vec<ScanError>,
+}
+
+struct Token {
     pub kind: String,
     pub lexeme: String,
     pub literal: Option<String>,
 }
 
-pub struct ScanError {
+struct ScanError {
     line: usize,
-    character: char,
+    message: String,
 }
 
-pub fn scan_tokens(source: &str) -> Result<(Vec<Token>, Vec<ScanError>)> {
-    let mut tokens = Vec::new();
-    let mut errors = Vec::new();
-    let mut line = 1;
+impl Scanner<'_> {
+    pub const fn new(source: &str) -> Scanner<'_> {
+        Scanner {
+            source,
+            line: 1,
+            offset: 0,
+            tokens: Vec::new(),
+            errors: Vec::new(),
+        }
+    }
 
-    let mut offset = 0;
-    while offset < source.len() {
-        let c = source.as_bytes()[offset] as char;
+    pub fn print(&self) {
+        for token in &self.tokens {
+            println!(
+                "{} {} {}",
+                token.kind,
+                token.lexeme,
+                token.literal.as_deref().unwrap_or("null")
+            );
+        }
+        for error in &self.errors {
+            eprintln!("[line {}] Error: {}", error.line, error.message);
+        }
+    }
 
-        let (token_type, lexeme, new_offset) = match c {
+    pub const fn has_errors(&self) -> bool {
+        !self.errors.is_empty()
+    }
+
+    pub fn scan_tokens(&mut self) -> Result<()> {
+        while self.offset < self.source.len() {
+            self.scan_once()?;
+        }
+        self.tokens.push(Token {
+            kind: "EOF".to_string(),
+            lexeme: String::new(),
+            literal: None,
+        });
+        Ok(())
+    }
+
+    fn scan_once(&mut self) -> Result<()> {
+        let c = self.source.as_bytes()[self.offset] as char;
+
+        match c {
             ',' | '.' | '-' | '+' | ';' | '*' | '(' | ')' | '{' | '}' => {
-                scan_single_character_token(source, offset)?
+                self.scan_single_character_token()
             }
-            '=' | '!' | '<' | '>' => scan_equal_operator(source, offset)?,
-            '/' => scan_slash(source, offset)?,
-            ' ' | '\t' => (String::new(), String::new(), offset + 1),
+            '=' | '!' | '<' | '>' => self.scan_equal_operator(),
+            '/' => self.scan_slash(),
+            ' ' | '\t' => {
+                self.offset += 1;
+                Ok(())
+            }
             '\n' => {
-                line += 1;
-                (String::new(), String::new(), offset + 1)
+                self.line += 1;
+                self.offset += 1;
+                Ok(())
             }
             _ => {
-                errors.push(ScanError { line, character: c });
-                (String::new(), String::new(), offset + 1)
+                self.errors.push(ScanError {
+                    line: self.line,
+                    message: format!("Unexpected character: {c}"),
+                });
+                self.offset += 1;
+                Ok(())
             }
-        };
-        offset = new_offset;
-
-        if lexeme.is_empty() {
-            continue;
         }
-        tokens.push(Token {
+    }
+
+    fn scan_single_character_token(&mut self) -> Result<()> {
+        let c = self.source.as_bytes()[self.offset] as char;
+        let token_type = match c {
+            ',' => "COMMA",
+            '.' => "DOT",
+            '-' => "MINUS",
+            '+' => "PLUS",
+            ';' => "SEMICOLON",
+            '*' => "STAR",
+            '(' => "LEFT_PAREN",
+            ')' => "RIGHT_PAREN",
+            '{' => "LEFT_BRACE",
+            '}' => "RIGHT_BRACE",
+            _ => return Err(anyhow::anyhow!("Unexpected character: {}", c)),
+        }
+        .to_owned();
+
+        self.tokens.push(Token {
+            kind: token_type,
+            lexeme: c.to_string(),
+            literal: None,
+        });
+        self.offset += 1;
+
+        Ok(())
+    }
+
+    fn scan_equal_operator(&mut self) -> Result<()> {
+        let c = self.source.as_bytes()[self.offset] as char;
+        let mut lexeme = c.to_string();
+
+        let mut token_type = match c {
+            '=' => "EQUAL",
+            '!' => "BANG",
+            '<' => "LESS",
+            '>' => "GREATER",
+            _ => return Err(anyhow::anyhow!("Unexpected character: {}", c)),
+        }
+        .to_owned();
+        self.offset += 1;
+
+        if self.offset < self.source.len() && self.source.as_bytes()[self.offset] as char == '=' {
+            self.offset += 1;
+            lexeme += "=";
+            token_type += "_EQUAL";
+        }
+
+        self.tokens.push(Token {
             kind: token_type,
             lexeme,
             literal: None,
         });
+        Ok(())
     }
 
-    tokens.push(Token {
-        kind: "EOF".to_string(),
-        lexeme: String::new(),
-        literal: None,
-    });
-    Ok((tokens, errors))
-}
-
-pub fn print_tokens(tokens: &[Token], errors: &[ScanError]) {
-    for token in tokens {
-        println!(
-            "{} {} {}",
-            token.kind,
-            token.lexeme,
-            token.literal.as_deref().unwrap_or("null")
-        );
-    }
-    for error in errors {
-        eprintln!(
-            "[line {}] Error: Unexpected character: {}",
-            error.line, error.character
-        );
-    }
-}
-
-fn scan_single_character_token(source: &str, offset: usize) -> Result<(String, String, usize)> {
-    let c = source.as_bytes()[offset] as char;
-    let token_type = match c {
-        ',' => "COMMA",
-        '.' => "DOT",
-        '-' => "MINUS",
-        '+' => "PLUS",
-        ';' => "SEMICOLON",
-        '*' => "STAR",
-        '(' => "LEFT_PAREN",
-        ')' => "RIGHT_PAREN",
-        '{' => "LEFT_BRACE",
-        '}' => "RIGHT_BRACE",
-        _ => return Err(anyhow::anyhow!("Unexpected character: {}", c)),
-    }
-    .to_owned();
-    Ok((token_type, c.to_string(), offset + 1))
-}
-
-fn scan_equal_operator(source: &str, mut offset: usize) -> Result<(String, String, usize)> {
-    let c = source.as_bytes()[offset] as char;
-    let mut lexeme = c.to_string();
-
-    let mut token_type = match c {
-        '=' => "EQUAL",
-        '!' => "BANG",
-        '<' => "LESS",
-        '>' => "GREATER",
-        _ => return Err(anyhow::anyhow!("Unexpected character: {}", c)),
-    }
-    .to_owned();
-    offset += 1;
-
-    if offset < source.len() && source.as_bytes()[offset] as char == '=' {
-        offset += 1;
-        lexeme += "=";
-        token_type += "_EQUAL";
-    }
-    Ok((token_type, lexeme, offset))
-}
-
-fn scan_slash(source: &str, offset: usize) -> Result<(String, String, usize)> {
-    if offset >= source.len() || source.as_bytes()[offset] as char != '/' {
-        return Err(anyhow::anyhow!("Expected '/' at offset {}", offset,));
-    }
-    if offset + 1 < source.len() && source.as_bytes()[offset + 1] as char == '/' {
-        // find newline or end of file
-        let mut new_offset = offset + 2;
-        while new_offset < source.len() && source.as_bytes()[new_offset] as char != '\n' {
-            new_offset += 1;
+    fn scan_slash(&mut self) -> Result<()> {
+        if self.offset >= self.source.len() || self.source.as_bytes()[self.offset] as char != '/' {
+            return Err(anyhow::anyhow!("Expected '/' at offset {}", self.offset,));
         }
-        return Ok((String::new(), String::new(), new_offset));
+        if self.offset + 1 < self.source.len()
+            && self.source.as_bytes()[self.offset + 1] as char == '/'
+        {
+            // find newline or end of file
+            let mut new_offset = self.offset + 2;
+            while new_offset < self.source.len()
+                && self.source.as_bytes()[new_offset] as char != '\n'
+            {
+                new_offset += 1;
+            }
+            self.offset = new_offset;
+            return Ok(());
+        }
+
+        self.offset += 1;
+        self.tokens.push(Token {
+            kind: "SLASH".to_string(),
+            lexeme: "/".to_string(),
+            literal: None,
+        });
+        Ok(())
     }
-    Ok(("SLASH".to_string(), "/".to_string(), offset + 1))
 }
+
+// fn scan_string(
+//     source: &str,
+//     mut offset: usize,
+//     errors: &mut Vec<ScanError>,
+// ) -> Result<(Token, usize)> {
+//     if offset >= source.len() || source.as_bytes()[offset] as char != '"' {
+//         return Err(anyhow::anyhow!("Expected '\"' at offset {}", offset,));
+//     }
+
+//     offset += 1;
+//     let start_offset = offset;
+//     while offset < source.len() && source.as_bytes()[offset] as char != '"' {
+//         offset += 1;
+//     }
+
+//     if offset >= source.len() {
+//         errors.push(ScanError {
+//             line:
+
+//     return Ok((
+//         Token {
+//             kind: "STRING".to_string(),
+//             lexeme: source[start_offset - 1..offset + 1].to_string(),
+//             literal: Some(source[start_offset..offset].to_string()),
+//         },
+//         offset + 1,
+//     ));
+// }}
