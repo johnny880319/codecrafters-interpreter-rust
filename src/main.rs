@@ -22,7 +22,10 @@ fn main() {
                 String::new()
             });
 
-            let (tokens, errors) = scanning::scan_tokens(&file_contents);
+            let (tokens, errors) = scanning::scan_tokens(&file_contents).unwrap_or_else(|_| {
+                eprint!("Failed to scan tokens from file {filename}");
+                (Vec::new(), Vec::new())
+            });
             scanning::print_tokens(&tokens, &errors);
 
             if !errors.is_empty() {

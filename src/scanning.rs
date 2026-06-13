@@ -1,3 +1,5 @@
+use anyhow::Result;
+
 pub struct Token {
     pub kind: String,
     pub lexeme: String,
@@ -9,64 +11,33 @@ pub struct ScanError {
     character: char,
 }
 
-pub fn scan_tokens(source: &str) -> (Vec<Token>, Vec<ScanError>) {
-    let mut offset = 0;
+pub fn scan_tokens(source: &str) -> Result<(Vec<Token>, Vec<ScanError>)> {
     let mut tokens = Vec::new();
     let mut errors = Vec::new();
-    let mut line = 1;
+    let line = 1;
 
-    while offset < source.len() {
-        let c = source.as_bytes()[offset] as char;
-        let mut lexeme = c.to_string();
+    let mut head = 0;
+    while head < source.len() {
+        let c = source.as_bytes()[head] as char;
 
-        let token_type = match c {
-            ',' => "COMMA",
-            '.' => "DOT",
-            '-' => "MINUS",
-            '+' => "PLUS",
-            ';' => "SEMICOLON",
-            '/' => "SLASH",
-            '*' => "STAR",
-            '(' => "LEFT_PAREN",
-            ')' => "RIGHT_PAREN",
-            '{' => "LEFT_BRACE",
-            '}' => "RIGHT_BRACE",
-            '=' => {
-                if offset + 1 < source.len() && source.as_bytes()[offset + 1] as char == '=' {
-                    offset += 1;
-                    lexeme = "==".to_string();
-                    "EQUAL_EQUAL"
-                } else {
-                    "EQUAL"
-                }
+        let (token_type, tail) = match c {
+            ',' | '.' | '-' | '+' | ';' | '/' | '*' | '(' | ')' | '{' | '}' => {
+                scan_single_character_token(source, head)?
             }
-            '!' => {
-                if offset + 1 < source.len() && source.as_bytes()[offset + 1] as char == '=' {
-                    offset += 1;
-                    lexeme = "!=".to_string();
-                    "BANG_EQUAL"
-                } else {
-                    "BANG"
-                }
-            }
-            '\n' => {
-                line += 1;
-                offset += 1;
-                continue;
-            }
+            '=' | '!' | '<' | '>' => scan_equal_operator(source, head)?,
             _ => {
                 errors.push(ScanError { line, character: c });
-                offset += 1;
+                head += 1;
                 continue;
             }
         };
-        offset += 1;
 
         tokens.push(Token {
-            kind: token_type.to_string(),
-            lexeme,
+            kind: token_type,
+            lexeme: source[head..tail].to_string(),
             literal: None,
         });
+        head = tail;
     }
 
     tokens.push(Token {
@@ -74,7 +45,7 @@ pub fn scan_tokens(source: &str) -> (Vec<Token>, Vec<ScanError>) {
         lexeme: String::new(),
         literal: None,
     });
-    (tokens, errors)
+    Ok((tokens, errors))
 }
 
 pub fn print_tokens(tokens: &[Token], errors: &[ScanError]) {
@@ -92,4 +63,46 @@ pub fn print_tokens(tokens: &[Token], errors: &[ScanError]) {
             error.line, error.character
         );
     }
+}
+
+fn scan_single_character_token(source: &str, offset: usize) -> Result<(String, usize)> {
+    let c = source.as_bytes()[offset] as char;
+    let token_type = match c {
+        ',' => "COMMA",
+        '.' => "DOT",
+        '-' => "MINUS",
+        '+' => "PLUS",
+        ';' => "SEMICOLON",
+        '/' => "SLASH",
+        '*' => "STAR",
+        '(' => "LEFT_PAREN",
+        ')' => "RIGHT_PAREN",
+        '{' => "LEFT_BRACE",
+        '}' => "RIGHT_BRACE",
+        _ => return Err(anyhow::anyhow!("Unexpected character: {}", c)),
+    }
+    .to_owned();
+    Ok((token_type, offset + 1))
+}
+
+fn scan_equal_operator(source: &str, mut offset: usize) -> Result<(String, usize)> {
+    let c = source.as_bytes()[offset] as char;
+    let mut lexeme = c.to_string();
+
+    let mut token_type = match c {
+        '=' => "EQUAL",
+        '!' => "BANG",
+        '<' => "LESS",
+        '>' => "GREATER",
+        _ => return Err(anyhow::anyhow!("Unexpected character: {}", c)),
+    }
+    .to_owned();
+    offset += 1;
+
+    if offset < source.len() && source.as_bytes()[offset] as char == '=' {
+        offset += 1;
+        lexeme += "=";
+        token_type += "_EQUAL";
+    }
+    Ok((token_type, offset))
 }
