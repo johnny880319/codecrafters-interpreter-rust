@@ -11,19 +11,36 @@ pub fn scan_tokens(source: &str) -> Result<Vec<Token>> {
     let mut tokens = Vec::new();
 
     while offset < source.len() {
-        match source.as_bytes()[offset] {
-            b'(' => {
+        let c = source.as_bytes()[offset] as char;
+        match c {
+            '(' => {
                 tokens.push(Token {
                     token_type: "LEFT_PAREN".to_string(),
-                    lexeme: "(".to_string(),
+                    lexeme: c.to_string(),
                     literal: None,
                 });
                 offset += 1;
             }
-            b')' => {
+            ')' => {
                 tokens.push(Token {
                     token_type: "RIGHT_PAREN".to_string(),
-                    lexeme: ")".to_string(),
+                    lexeme: c.to_string(),
+                    literal: None,
+                });
+                offset += 1;
+            }
+            '{' => {
+                tokens.push(Token {
+                    token_type: "LEFT_BRACE".to_string(),
+                    lexeme: c.to_string(),
+                    literal: None,
+                });
+                offset += 1;
+            }
+            '}' => {
+                tokens.push(Token {
+                    token_type: "RIGHT_BRACE".to_string(),
+                    lexeme: c.to_string(),
                     literal: None,
                 });
                 offset += 1;
@@ -31,12 +48,13 @@ pub fn scan_tokens(source: &str) -> Result<Vec<Token>> {
             _ => {
                 return Err(anyhow::anyhow!(
                     "Unexpected character '{}' at offset {}",
-                    source.as_bytes()[offset] as char,
+                    c,
                     offset
                 ));
             }
         }
     }
+
     tokens.push(Token {
         token_type: "EOF".to_string(),
         lexeme: "".to_string(),
