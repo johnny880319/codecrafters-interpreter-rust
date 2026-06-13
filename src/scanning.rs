@@ -14,7 +14,7 @@ pub struct ScanError {
 pub fn scan_tokens(source: &str) -> Result<(Vec<Token>, Vec<ScanError>)> {
     let mut tokens = Vec::new();
     let mut errors = Vec::new();
-    let line = 1;
+    let mut line = 1;
 
     let mut offset = 0;
     while offset < source.len() {
@@ -26,22 +26,26 @@ pub fn scan_tokens(source: &str) -> Result<(Vec<Token>, Vec<ScanError>)> {
             }
             '=' | '!' | '<' | '>' => scan_equal_operator(source, offset)?,
             '/' => scan_slash(source, offset)?,
+            ' ' | '\t' => (String::new(), String::new(), offset + 1),
+            '\n' => {
+                line += 1;
+                (String::new(), String::new(), offset + 1)
+            }
             _ => {
                 errors.push(ScanError { line, character: c });
-                offset += 1;
-                continue;
+                (String::new(), String::new(), offset + 1)
             }
         };
+        offset = new_offset;
 
         if lexeme.is_empty() {
-            break;
+            continue;
         }
         tokens.push(Token {
             kind: token_type,
             lexeme,
             literal: None,
         });
-        offset = new_offset;
     }
 
     tokens.push(Token {
