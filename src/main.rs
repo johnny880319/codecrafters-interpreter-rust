@@ -22,11 +22,12 @@ fn main() {
                 String::new()
             });
 
-            let tokens = scanning::scan_tokens(&file_contents).unwrap_or_else(|err| {
-                eprintln!("Error scanning tokens: {}", err);
-                Vec::new()
-            });
-            scanning::print_tokens(&tokens);
+            let (tokens, errors) = scanning::scan_tokens(&file_contents);
+            scanning::print_tokens(&tokens, &errors);
+
+            if !errors.is_empty() {
+                std::process::exit(65);
+            }
         }
         _ => {
             eprintln!("Unknown command: {}", command);
