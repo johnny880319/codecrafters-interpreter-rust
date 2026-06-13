@@ -18,7 +18,7 @@ fn main() {
             eprintln!("Logs from your program will appear here!");
 
             let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
-                eprintln!("Failed to read file {}", filename);
+                eprintln!("Failed to read file {filename}");
                 String::new()
             });
 
@@ -30,7 +30,7 @@ fn main() {
             }
         }
         _ => {
-            eprintln!("Unknown command: {}", command);
+            eprintln!("Unknown command: {command}");
         }
     }
 }

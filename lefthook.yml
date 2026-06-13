@@ -8,9 +8,8 @@ pre-commit:
   commands:
     # rust
     rust-lint-format:
-      root: "rust-codebase/"
       glob: "**/*.rs"
-      run: cargo fmt && cargo clippy --fix --allow-dirty --allow-staged && cargo clippy -- -D warnings
+      run: cargo fmt --check && cargo clippy --all-targets -- -D warnings
       stage_fixed: true
 
 pre-push:
@@ -18,6 +17,5 @@ pre-push:
   commands:
     # rust
     rust-test:
-      root: "rust-codebase/"
       glob: "**/*.rs"
       run: cargo test
