@@ -12,39 +12,19 @@ pub fn scan_tokens(source: &str) -> Result<Vec<Token>> {
 
     while offset < source.len() {
         let c = source.as_bytes()[offset] as char;
-        match c {
-            '(' => {
-                tokens.push(Token {
-                    token_type: "LEFT_PAREN".to_string(),
-                    lexeme: c.to_string(),
-                    literal: None,
-                });
-                offset += 1;
-            }
-            ')' => {
-                tokens.push(Token {
-                    token_type: "RIGHT_PAREN".to_string(),
-                    lexeme: c.to_string(),
-                    literal: None,
-                });
-                offset += 1;
-            }
-            '{' => {
-                tokens.push(Token {
-                    token_type: "LEFT_BRACE".to_string(),
-                    lexeme: c.to_string(),
-                    literal: None,
-                });
-                offset += 1;
-            }
-            '}' => {
-                tokens.push(Token {
-                    token_type: "RIGHT_BRACE".to_string(),
-                    lexeme: c.to_string(),
-                    literal: None,
-                });
-                offset += 1;
-            }
+
+        let token_type = match c {
+            ',' => "COMMA",
+            '.' => "DOT",
+            '-' => "MINUS",
+            '+' => "PLUS",
+            ';' => "SEMICOLON",
+            '/' => "SLASH",
+            '*' => "STAR",
+            '(' => "LEFT_PAREN",
+            ')' => "RIGHT_PAREN",
+            '{' => "LEFT_BRACE",
+            '}' => "RIGHT_BRACE",
             _ => {
                 return Err(anyhow::anyhow!(
                     "Unexpected character '{}' at offset {}",
@@ -52,7 +32,14 @@ pub fn scan_tokens(source: &str) -> Result<Vec<Token>> {
                     offset
                 ));
             }
-        }
+        };
+
+        tokens.push(Token {
+            token_type: token_type.to_string(),
+            lexeme: c.to_string(),
+            literal: None,
+        });
+        offset += 1;
     }
 
     tokens.push(Token {
