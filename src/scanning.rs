@@ -62,11 +62,13 @@ impl Scanner<'_> {
 
     fn scan_once(&mut self) -> Result<()> {
         let c = self.source.as_bytes()[self.offset] as char;
+        self.offset += 1;
 
         match c {
             ',' | '.' | '-' | '+' | ';' | '*' | '(' | ')' | '{' | '}' => {
                 self.scan_single_character_token(c)?;
             }
+            '_' | 'a'..='z' | 'A'..='Z' => self.scan_identifier(c),
             '=' | '!' | '<' | '>' => self.scan_equal_operator(c)?,
             ' ' | '\t' | '\n' => self.scan_space(c),
             '0'..='9' => self.scan_number(c),
@@ -98,9 +100,28 @@ impl Scanner<'_> {
             lexeme: c.to_string(),
             literal: None,
         });
-        self.offset += 1;
 
         Ok(())
+    }
+
+    fn scan_identifier(&mut self, c: char) {
+        let mut lexeme = c.to_string();
+
+        while self.offset < self.source.len() {
+            let next_char = self.source.as_bytes()[self.offset] as char;
+            if next_char == '_' || next_char.is_ascii_alphanumeric() {
+                lexeme += &next_char.to_string();
+                self.offset += 1;
+            } else {
+                break;
+            }
+        }
+
+        self.tokens.push(Token {
+            kind: "IDENTIFIER".to_string(),
+            lexeme,
+            literal: None,
+        });
     }
 
     fn scan_equal_operator(&mut self, c: char) -> Result<()> {
@@ -114,7 +135,6 @@ impl Scanner<'_> {
             _ => return Err(anyhow::anyhow!("Unexpected character: {}", c)),
         }
         .to_owned();
-        self.offset += 1;
 
         if self.offset < self.source.len() && self.source.as_bytes()[self.offset] as char == '=' {
             self.offset += 1;
@@ -131,7 +151,6 @@ impl Scanner<'_> {
     }
 
     const fn scan_space(&mut self, c: char) {
-        self.offset += 1;
         if c == '\n' {
             self.line += 1;
         }
@@ -139,7 +158,6 @@ impl Scanner<'_> {
 
     fn scan_number(&mut self, c: char) {
         let mut num_string = c.to_string();
-        self.offset += 1;
 
         let mut has_dot = false;
         while self.offset < self.source.len() {
@@ -173,7 +191,6 @@ impl Scanner<'_> {
     }
 
     fn scan_string(&mut self, _: char) {
-        self.offset += 1;
         let start_offset = self.offset;
         while self.offset < self.source.len() && self.source.as_bytes()[self.offset] as char != '"'
         {
@@ -198,11 +215,9 @@ impl Scanner<'_> {
     }
 
     fn scan_slash(&mut self, _: char) {
-        if self.offset + 1 < self.source.len()
-            && self.source.as_bytes()[self.offset + 1] as char == '/'
-        {
+        if self.offset < self.source.len() && self.source.as_bytes()[self.offset] as char == '/' {
             // find newline or end of file
-            let mut new_offset = self.offset + 2;
+            let mut new_offset = self.offset + 1;
             while new_offset < self.source.len()
                 && self.source.as_bytes()[new_offset] as char != '\n'
             {
@@ -213,6 +228,7 @@ impl Scanner<'_> {
         }
 
         self.offset += 1;
+
         self.tokens.push(Token {
             kind: "SLASH".to_string(),
             lexeme: "/".to_string(),
@@ -225,6 +241,5 @@ impl Scanner<'_> {
             line: self.line,
             message: format!("Unexpected character: {c}"),
         });
-        self.offset += 1;
     }
 }
