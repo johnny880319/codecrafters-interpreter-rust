@@ -69,6 +69,7 @@ impl Scanner<'_> {
             }
             '=' | '!' | '<' | '>' => self.scan_equal_operator(c)?,
             ' ' | '\t' | '\n' => self.scan_space(c),
+            '0'..='9' => self.scan_number(c),
             '"' => self.scan_string(c),
             '/' => self.scan_slash(c),
             _ => self.unexpected_character(c),
@@ -134,6 +135,41 @@ impl Scanner<'_> {
         if c == '\n' {
             self.line += 1;
         }
+    }
+
+    fn scan_number(&mut self, c: char) {
+        let mut num_string = c.to_string();
+        self.offset += 1;
+
+        let mut has_dot = false;
+        while self.offset < self.source.len() {
+            let next_char = self.source.as_bytes()[self.offset] as char;
+            if next_char == '.' && !has_dot {
+                has_dot = true;
+                num_string += ".";
+                self.offset += 1;
+            } else if next_char.is_ascii_digit() {
+                num_string += &next_char.to_string();
+                self.offset += 1;
+            } else {
+                break;
+            }
+        }
+
+        let mut literal = num_string.clone();
+        if !has_dot {
+            literal += ".0";
+        }
+
+        while literal.ends_with("00") {
+            literal.pop();
+        }
+
+        self.tokens.push(Token {
+            kind: "NUMBER".to_string(),
+            lexeme: num_string.clone(),
+            literal: Some(literal),
+        });
     }
 
     fn scan_string(&mut self, _: char) {
