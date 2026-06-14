@@ -117,8 +117,14 @@ impl Scanner<'_> {
             }
         }
 
+        let token_type = match lexeme.as_str() {
+            "and" | "class" | "else" | "false" | "for" | "fun" | "if" | "nil" | "or" | "print"
+            | "return" | "super" | "this" | "true" | "var" | "while" => lexeme.to_uppercase(),
+            _ => "IDENTIFIER".to_string(),
+        };
+
         self.tokens.push(Token {
-            kind: "IDENTIFIER".to_string(),
+            kind: token_type,
             lexeme,
             literal: None,
         });
