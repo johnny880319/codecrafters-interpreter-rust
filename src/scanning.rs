@@ -8,14 +8,12 @@ pub struct Scanner<'a> {
     errors: Vec<ScanError>,
 }
 
-#[derive(Clone)]
 pub struct Token {
     pub kind: TokenType,
     pub lexeme: String,
     pub literal: Option<String>,
 }
 
-#[derive(Clone)]
 pub struct ScanError {
     pub line: usize,
     pub message: String,
@@ -256,7 +254,6 @@ impl Scanner<'_> {
     }
 }
 
-#[derive(Clone)]
 pub enum TokenType {
     // Single-character tokens
     Comma,
