@@ -21,29 +21,27 @@ pub struct ScanError {
     pub message: String,
 }
 
+pub fn scan_tokens(source: &str) -> Result<(Vec<Token>, Vec<ScanError>)> {
+    let mut scanner = Scanner {
+        source,
+        line: 1,
+        offset: 0,
+        tokens: Vec::new(),
+        errors: Vec::new(),
+    };
+
+    while scanner.offset < scanner.source.len() {
+        scanner.scan_once()?;
+    }
+    scanner.tokens.push(Token {
+        kind: TokenType::Eof,
+        lexeme: String::new(),
+        literal: None,
+    });
+    Ok((scanner.tokens.clone(), scanner.errors.clone()))
+}
+
 impl Scanner<'_> {
-    pub const fn new(source: &str) -> Scanner<'_> {
-        Scanner {
-            source,
-            line: 1,
-            offset: 0,
-            tokens: Vec::new(),
-            errors: Vec::new(),
-        }
-    }
-
-    pub fn scan_tokens(&mut self) -> Result<(Vec<Token>, Vec<ScanError>)> {
-        while self.offset < self.source.len() {
-            self.scan_once()?;
-        }
-        self.tokens.push(Token {
-            kind: TokenType::Eof,
-            lexeme: String::new(),
-            literal: None,
-        });
-        Ok((self.tokens.clone(), self.errors.clone()))
-    }
-
     fn scan_once(&mut self) -> Result<()> {
         let c = self.source.as_bytes()[self.offset] as char;
         self.offset += 1;
@@ -185,8 +183,8 @@ impl Scanner<'_> {
         }
 
         if literal.ends_with('.') {
-            literal.pop();
-            num_string += "0";
+            literal += "0";
+            num_string.pop();
             self.offset -= 1;
         }
 

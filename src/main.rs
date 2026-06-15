@@ -1,4 +1,4 @@
-use crate::scanning::{ScanError, Scanner, Token};
+use crate::scanning::{ScanError, Token};
 use std::env;
 use std::fs;
 
@@ -23,9 +23,7 @@ fn main() {
                 String::new()
             });
 
-            let mut scanner = Scanner::new(&file_contents);
-
-            let (tokens, errors) = scanner.scan_tokens().unwrap_or_else(|_| {
+            let (tokens, errors) = scanning::scan_tokens(&file_contents).unwrap_or_else(|_| {
                 eprintln!("Failed to scan tokens from file {filename}");
                 (Vec::new(), Vec::new())
             });
