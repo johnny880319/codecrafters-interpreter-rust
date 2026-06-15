@@ -1,4 +1,4 @@
-use crate::scanning::Scanner;
+use crate::scanning::{ScanError, Scanner, Token};
 use std::env;
 use std::fs;
 
@@ -24,17 +24,33 @@ fn main() {
             });
 
             let mut scanner = Scanner::new(&file_contents);
-            scanner.scan_tokens().unwrap_or_else(|_| {
-                eprintln!("Failed to scan tokens from file {filename}");
-            });
-            scanner.print();
 
-            if scanner.has_errors() {
+            let (tokens, errors) = scanner.scan_tokens().unwrap_or_else(|_| {
+                eprintln!("Failed to scan tokens from file {filename}");
+                (Vec::new(), Vec::new())
+            });
+
+            print_results(&tokens, &errors);
+            if !errors.is_empty() {
                 std::process::exit(65);
             }
         }
         _ => {
             eprintln!("Unknown command: {command}");
         }
+    }
+}
+
+fn print_results(tokens: &[Token], errors: &[ScanError]) {
+    for token in tokens {
+        println!(
+            "{} {} {}",
+            token.kind.as_str(),
+            token.lexeme,
+            token.literal.as_deref().unwrap_or("null")
+        );
+    }
+    for error in errors {
+        eprintln!("[line {}] Error: {}", error.line, error.message);
     }
 }

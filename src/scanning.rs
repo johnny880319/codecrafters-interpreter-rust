@@ -8,15 +8,17 @@ pub struct Scanner<'a> {
     errors: Vec<ScanError>,
 }
 
-struct Token {
-    pub kind: String,
+#[derive(Clone)]
+pub struct Token {
+    pub kind: TokenType,
     pub lexeme: String,
     pub literal: Option<String>,
 }
 
-struct ScanError {
-    line: usize,
-    message: String,
+#[derive(Clone)]
+pub struct ScanError {
+    pub line: usize,
+    pub message: String,
 }
 
 impl Scanner<'_> {
@@ -30,34 +32,16 @@ impl Scanner<'_> {
         }
     }
 
-    pub fn print(&self) {
-        for token in &self.tokens {
-            println!(
-                "{} {} {}",
-                token.kind,
-                token.lexeme,
-                token.literal.as_deref().unwrap_or("null")
-            );
-        }
-        for error in &self.errors {
-            eprintln!("[line {}] Error: {}", error.line, error.message);
-        }
-    }
-
-    pub const fn has_errors(&self) -> bool {
-        !self.errors.is_empty()
-    }
-
-    pub fn scan_tokens(&mut self) -> Result<()> {
+    pub fn scan_tokens(&mut self) -> Result<(Vec<Token>, Vec<ScanError>)> {
         while self.offset < self.source.len() {
             self.scan_once()?;
         }
         self.tokens.push(Token {
-            kind: "EOF".to_string(),
+            kind: TokenType::Eof,
             lexeme: String::new(),
             literal: None,
         });
-        Ok(())
+        Ok((self.tokens.clone(), self.errors.clone()))
     }
 
     fn scan_once(&mut self) -> Result<()> {
@@ -66,34 +50,33 @@ impl Scanner<'_> {
 
         match c {
             ',' | '.' | '-' | '+' | ';' | '*' | '(' | ')' | '{' | '}' => {
-                self.scan_single_character_token(c)?;
+                self.scan_single_character(c)?;
             }
-            '_' | 'a'..='z' | 'A'..='Z' => self.scan_identifier(c),
-            '=' | '!' | '<' | '>' => self.scan_equal_operator(c)?,
-            ' ' | '\t' | '\n' => self.scan_space(c),
+            '=' | '!' | '<' | '>' => self.scan_one_or_two_character(c)?,
+            '_' | 'a'..='z' | 'A'..='Z' => self.scan_keywords_and_identifier(c),
             '0'..='9' => self.scan_number(c),
             '"' => self.scan_string(c),
             '/' => self.scan_slash(c),
+            ' ' | '\t' | '\n' => self.scan_space(c),
             _ => self.unexpected_character(c),
         }
         Ok(())
     }
 
-    fn scan_single_character_token(&mut self, c: char) -> Result<()> {
+    fn scan_single_character(&mut self, c: char) -> Result<()> {
         let token_type = match c {
-            ',' => "COMMA",
-            '.' => "DOT",
-            '-' => "MINUS",
-            '+' => "PLUS",
-            ';' => "SEMICOLON",
-            '*' => "STAR",
-            '(' => "LEFT_PAREN",
-            ')' => "RIGHT_PAREN",
-            '{' => "LEFT_BRACE",
-            '}' => "RIGHT_BRACE",
+            ',' => TokenType::Comma,
+            '.' => TokenType::Dot,
+            '-' => TokenType::Minus,
+            '+' => TokenType::Plus,
+            ';' => TokenType::Semicolon,
+            '*' => TokenType::Star,
+            '(' => TokenType::LeftParen,
+            ')' => TokenType::RightParen,
+            '{' => TokenType::LeftBrace,
+            '}' => TokenType::RightBrace,
             _ => return Err(anyhow::anyhow!("Unexpected character: {}", c)),
-        }
-        .to_owned();
+        };
 
         self.tokens.push(Token {
             kind: token_type,
@@ -104,7 +87,37 @@ impl Scanner<'_> {
         Ok(())
     }
 
-    fn scan_identifier(&mut self, c: char) {
+    fn scan_one_or_two_character(&mut self, c: char) -> Result<()> {
+        let mut lexeme = c.to_string();
+
+        let mut token_len = 1;
+        if self.offset < self.source.len() && self.source.as_bytes()[self.offset] as char == '=' {
+            self.offset += 1;
+            token_len += 1;
+            lexeme += "=";
+        }
+
+        let token_type = match (c, token_len) {
+            ('=', 1) => TokenType::Equal,
+            ('!', 1) => TokenType::Bang,
+            ('<', 1) => TokenType::Less,
+            ('>', 1) => TokenType::Greater,
+            ('=', 2) => TokenType::EqualEqual,
+            ('!', 2) => TokenType::BangEqual,
+            ('<', 2) => TokenType::LessEqual,
+            ('>', 2) => TokenType::GreaterEqual,
+            _ => return Err(anyhow::anyhow!("Unexpected character: {}", c)),
+        };
+
+        self.tokens.push(Token {
+            kind: token_type,
+            lexeme,
+            literal: None,
+        });
+        Ok(())
+    }
+
+    fn scan_keywords_and_identifier(&mut self, c: char) {
         let mut lexeme = c.to_string();
 
         while self.offset < self.source.len() {
@@ -118,9 +131,23 @@ impl Scanner<'_> {
         }
 
         let token_type = match lexeme.as_str() {
-            "and" | "class" | "else" | "false" | "for" | "fun" | "if" | "nil" | "or" | "print"
-            | "return" | "super" | "this" | "true" | "var" | "while" => lexeme.to_uppercase(),
-            _ => "IDENTIFIER".to_string(),
+            "and" => TokenType::And,
+            "class" => TokenType::Class,
+            "else" => TokenType::Else,
+            "false" => TokenType::False,
+            "for" => TokenType::For,
+            "fun" => TokenType::Fun,
+            "if" => TokenType::If,
+            "nil" => TokenType::Nil,
+            "or" => TokenType::Or,
+            "print" => TokenType::Print,
+            "return" => TokenType::Return,
+            "super" => TokenType::Super,
+            "this" => TokenType::This,
+            "true" => TokenType::True,
+            "var" => TokenType::Var,
+            "while" => TokenType::While,
+            _ => TokenType::Identifier,
         };
 
         self.tokens.push(Token {
@@ -128,38 +155,6 @@ impl Scanner<'_> {
             lexeme,
             literal: None,
         });
-    }
-
-    fn scan_equal_operator(&mut self, c: char) -> Result<()> {
-        let mut lexeme = c.to_string();
-
-        let mut token_type = match c {
-            '=' => "EQUAL",
-            '!' => "BANG",
-            '<' => "LESS",
-            '>' => "GREATER",
-            _ => return Err(anyhow::anyhow!("Unexpected character: {}", c)),
-        }
-        .to_owned();
-
-        if self.offset < self.source.len() && self.source.as_bytes()[self.offset] as char == '=' {
-            self.offset += 1;
-            lexeme += "=";
-            token_type += "_EQUAL";
-        }
-
-        self.tokens.push(Token {
-            kind: token_type,
-            lexeme,
-            literal: None,
-        });
-        Ok(())
-    }
-
-    const fn scan_space(&mut self, c: char) {
-        if c == '\n' {
-            self.line += 1;
-        }
     }
 
     fn scan_number(&mut self, c: char) {
@@ -189,8 +184,14 @@ impl Scanner<'_> {
             literal.pop();
         }
 
+        if literal.ends_with('.') {
+            literal.pop();
+            num_string += "0";
+            self.offset -= 1;
+        }
+
         self.tokens.push(Token {
-            kind: "NUMBER".to_string(),
+            kind: TokenType::Number,
             lexeme: num_string.clone(),
             literal: Some(literal),
         });
@@ -200,6 +201,9 @@ impl Scanner<'_> {
         let start_offset = self.offset;
         while self.offset < self.source.len() && self.source.as_bytes()[self.offset] as char != '"'
         {
+            if self.source.as_bytes()[self.offset] as char == '\n' {
+                self.line += 1;
+            }
             self.offset += 1;
         }
 
@@ -212,7 +216,7 @@ impl Scanner<'_> {
         }
 
         self.tokens.push(Token {
-            kind: "STRING".to_string(),
+            kind: TokenType::String,
             lexeme: self.source[(start_offset - 1)..=self.offset].to_string(),
             literal: Some(self.source[start_offset..self.offset].to_string()),
         });
@@ -233,13 +237,17 @@ impl Scanner<'_> {
             return;
         }
 
-        self.offset += 1;
-
         self.tokens.push(Token {
-            kind: "SLASH".to_string(),
+            kind: TokenType::Slash,
             lexeme: "/".to_string(),
             literal: None,
         });
+    }
+
+    const fn scan_space(&mut self, c: char) {
+        if c == '\n' {
+            self.line += 1;
+        }
     }
 
     fn unexpected_character(&mut self, c: char) {
@@ -247,5 +255,116 @@ impl Scanner<'_> {
             line: self.line,
             message: format!("Unexpected character: {c}"),
         });
+    }
+}
+
+#[derive(Clone)]
+pub enum TokenType {
+    // Single-character tokens
+    Comma,
+    Dot,
+    Minus,
+    Plus,
+    Semicolon,
+    Star,
+    LeftParen,
+    RightParen,
+    LeftBrace,
+    RightBrace,
+
+    // One or two character tokens
+    Equal,
+    Bang,
+    Less,
+    Greater,
+    EqualEqual,
+    BangEqual,
+    LessEqual,
+    GreaterEqual,
+
+    // Keywords
+    And,
+    Class,
+    Else,
+    False,
+    For,
+    Fun,
+    If,
+    Nil,
+    Or,
+    Print,
+    Return,
+    Super,
+    This,
+    True,
+    Var,
+    While,
+
+    // Literals
+    Identifier,
+    String,
+    Number,
+
+    // Slash
+    Slash,
+
+    // EOF
+    Eof,
+}
+
+impl TokenType {
+    pub const fn as_str(&self) -> &str {
+        match self {
+            // Single-character tokens.
+            Self::Comma => "COMMA",
+            Self::Dot => "DOT",
+            Self::Minus => "MINUS",
+            Self::Plus => "PLUS",
+            Self::Semicolon => "SEMICOLON",
+            Self::Star => "STAR",
+            Self::LeftParen => "LEFT_PAREN",
+            Self::RightParen => "RIGHT_PAREN",
+            Self::LeftBrace => "LEFT_BRACE",
+            Self::RightBrace => "RIGHT_BRACE",
+
+            // One or two character tokens
+            Self::Equal => "EQUAL",
+            Self::Bang => "BANG",
+            Self::Less => "LESS",
+            Self::Greater => "GREATER",
+            Self::EqualEqual => "EQUAL_EQUAL",
+            Self::BangEqual => "BANG_EQUAL",
+            Self::LessEqual => "LESS_EQUAL",
+            Self::GreaterEqual => "GREATER_EQUAL",
+
+            // Keywords
+            Self::And => "AND",
+            Self::Class => "CLASS",
+            Self::Else => "ELSE",
+            Self::False => "FALSE",
+            Self::For => "FOR",
+            Self::Fun => "FUN",
+            Self::If => "IF",
+            Self::Nil => "NIL",
+            Self::Or => "OR",
+            Self::Print => "PRINT",
+            Self::Return => "RETURN",
+            Self::Super => "SUPER",
+            Self::This => "THIS",
+            Self::True => "TRUE",
+            Self::Var => "VAR",
+            Self::While => "WHILE",
+
+            // Literals
+            Self::Identifier => "IDENTIFIER",
+            Self::String => "STRING",
+            Self::Number => "NUMBER",
+
+            // Slash
+            Self::Slash => "SLASH",
+
+            // EOF
+            Self::Eof => "EOF",
+        }
     }
 }
