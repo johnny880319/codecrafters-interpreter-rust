@@ -38,7 +38,7 @@ pub fn scan_tokens(source: &str) -> Result<(Vec<Token>, Vec<ScanError>)> {
         lexeme: String::new(),
         literal: None,
     });
-    Ok((scanner.tokens.clone(), scanner.errors.clone()))
+    Ok((scanner.tokens, scanner.errors))
 }
 
 impl Scanner<'_> {
