@@ -1,6 +1,8 @@
-#![allow(unused_variables)]
+use crate::scanning::{ScanError, Token};
 use std::env;
 use std::fs;
+
+mod scanning;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -14,23 +16,39 @@ fn main() {
 
     match command.as_str() {
         "tokenize" => {
-            // You can use print statements as follows for debugging, they'll be visible when running tests.
             eprintln!("Logs from your program will appear here!");
 
             let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
-                eprintln!("Failed to read file {}", filename);
+                eprintln!("Failed to read file {filename}");
                 String::new()
             });
 
-            // TODO: Uncomment the code below to pass the first stage
-            // if !file_contents.is_empty() {
-            //     panic!("Scanner not implemented");
-            // } else {
-            //     println!("EOF  null"); // Placeholder, replace this line when implementing the scanner
-            // }
+            let (tokens, errors) = scanning::scan_tokens(&file_contents).unwrap_or_else(|_| {
+                eprintln!("Failed to scan tokens from file {filename}");
+                (Vec::new(), Vec::new())
+            });
+
+            print_results(&tokens, &errors);
+            if !errors.is_empty() {
+                std::process::exit(65);
+            }
         }
         _ => {
-            eprintln!("Unknown command: {}", command);
+            eprintln!("Unknown command: {command}");
         }
+    }
+}
+
+fn print_results(tokens: &[Token], errors: &[ScanError]) {
+    for token in tokens {
+        println!(
+            "{} {} {}",
+            token.kind.as_str(),
+            token.lexeme,
+            token.literal.as_deref().unwrap_or("null")
+        );
+    }
+    for error in errors {
+        eprintln!("[line {}] Error: {}", error.line, error.message);
     }
 }
