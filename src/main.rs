@@ -1,8 +1,10 @@
+mod parsing;
+mod scanning;
+
+use crate::parsing::AstNode;
 use crate::scanning::{ScanError, Token};
 use std::env;
 use std::fs;
-
-mod scanning;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -36,7 +38,11 @@ fn main() {
                 eprintln!("Failed to scan tokens from file {filename}");
                 (Vec::new(), Vec::new())
             });
-            print_parse_results(&tokens);
+            let (ast_nodes, _) = parsing::build_ast(&tokens, 0).unwrap_or_else(|_| {
+                eprintln!("Failed to build AST from tokens in file {filename}");
+                (Vec::new(), 0)
+            });
+            print_parse_results(&ast_nodes);
         }
         _ => {
             eprintln!("Unknown command: {command}");
@@ -58,12 +64,18 @@ fn print_scan_results(tokens: &[Token], errors: &[ScanError]) {
     }
 }
 
-fn print_parse_results(tokens: &[Token]) {
-    for token in tokens {
-        if token.literal.is_some() {
-            println!("{}", token.literal.as_deref().unwrap());
-        } else {
-            println!("{}", token.lexeme);
+fn print_parse_results(ast_nodes: &[AstNode]) {
+    for node in ast_nodes {
+        if !node.children.is_empty() {
+            print!("(");
+        }
+        print!("{}", node.val);
+        if !node.children.is_empty() {
+            print!(" ");
+        }
+        print_parse_results(&node.children);
+        if !node.children.is_empty() {
+            print!(")");
         }
     }
 }
