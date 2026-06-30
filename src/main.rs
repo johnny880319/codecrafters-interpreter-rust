@@ -14,24 +14,29 @@ fn main() {
     let command = &args[1];
     let filename = &args[2];
 
+    let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
+        eprintln!("Failed to read file {filename}");
+        String::new()
+    });
+
     match command.as_str() {
         "tokenize" => {
-            eprintln!("Logs from your program will appear here!");
-
-            let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
-                eprintln!("Failed to read file {filename}");
-                String::new()
-            });
-
             let (tokens, errors) = scanning::scan_tokens(&file_contents).unwrap_or_else(|_| {
                 eprintln!("Failed to scan tokens from file {filename}");
                 (Vec::new(), Vec::new())
             });
 
-            print_results(&tokens, &errors);
+            print_scan_results(&tokens, &errors);
             if !errors.is_empty() {
                 std::process::exit(65);
             }
+        }
+        "parse" => {
+            let (tokens, _) = scanning::scan_tokens(&file_contents).unwrap_or_else(|_| {
+                eprintln!("Failed to scan tokens from file {filename}");
+                (Vec::new(), Vec::new())
+            });
+            print_parse_results(&tokens);
         }
         _ => {
             eprintln!("Unknown command: {command}");
@@ -39,7 +44,7 @@ fn main() {
     }
 }
 
-fn print_results(tokens: &[Token], errors: &[ScanError]) {
+fn print_scan_results(tokens: &[Token], errors: &[ScanError]) {
     for token in tokens {
         println!(
             "{} {} {}",
@@ -50,5 +55,15 @@ fn print_results(tokens: &[Token], errors: &[ScanError]) {
     }
     for error in errors {
         eprintln!("[line {}] Error: {}", error.line, error.message);
+    }
+}
+
+fn print_parse_results(tokens: &[Token]) {
+    for token in tokens {
+        if token.literal.is_some() {
+            println!("{}", token.literal.as_deref().unwrap());
+        } else {
+            println!("{}", token.lexeme);
+        }
     }
 }
