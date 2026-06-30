@@ -23,6 +23,14 @@ pub fn build_ast(tokens: &[Token], mut offset: usize) -> Result<(Vec<AstNode>, u
             TokenType::RightParen => {
                 return Ok((ast_nodes, offset + 1));
             }
+            TokenType::Bang | TokenType::Minus => {
+                let (children, new_offset) = build_ast(tokens, offset + 1)?;
+                ast_nodes.push(AstNode {
+                    val: token.lexeme.clone(),
+                    children,
+                });
+                offset = new_offset;
+            }
             _ => {
                 if token.literal.is_some() {
                     ast_nodes.push(AstNode {
