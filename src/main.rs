@@ -40,10 +40,7 @@ fn main() {
             });
             let ast_node = parsing::parse_expression(&tokens).unwrap_or_else(|e| {
                 eprintln!("Failed to build AST: {e}");
-                parsing::AstNode {
-                    val: String::new(),
-                    children: Vec::new(),
-                }
+                std::process::exit(65);
             });
             print_parse_results(&[ast_node]);
         }
