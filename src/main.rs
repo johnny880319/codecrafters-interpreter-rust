@@ -1,7 +1,7 @@
 mod parsing;
 mod scanning;
 
-use crate::parsing::AstNode;
+use crate::parsing::Expr;
 use crate::scanning::{ScanError, Token};
 use std::env;
 use std::fs;
@@ -38,11 +38,11 @@ fn main() {
                 eprintln!("Failed to scan tokens from file {filename}");
                 (Vec::new(), Vec::new())
             });
-            let ast_node = parsing::parse_expression(&tokens).unwrap_or_else(|e| {
+            let expr = parsing::parse_expression(&tokens).unwrap_or_else(|e| {
                 eprintln!("Failed to build AST: {e}");
                 std::process::exit(65);
             });
-            print_parse_results(&[ast_node]);
+            print_parse_results(expr);
         }
         _ => {
             eprintln!("Unknown command: {command}");
@@ -64,21 +64,37 @@ fn print_scan_results(tokens: &[Token], errors: &[ScanError]) {
     }
 }
 
-fn print_parse_results(ast_nodes: &[AstNode]) {
-    for (i, node) in ast_nodes.iter().enumerate() {
-        if !node.children.is_empty() {
-            print!("(");
+fn print_parse_results(expr: Expr) {
+    match expr {
+        Expr::Number(value) | Expr::String(value) => {
+            print!("{value}");
         }
-        print!("{}", node.val);
-        if !node.children.is_empty() {
-            print!(" ");
+        Expr::Bool(value) => {
+            print!("{value}");
         }
-        print_parse_results(&node.children);
-        if !node.children.is_empty() {
+        Expr::Nil => {
+            print!("nil");
+        }
+        Expr::Group(expr) => {
+            print!("(group ");
+            print_parse_results(*expr);
             print!(")");
         }
-        if i < ast_nodes.len() - 1 {
+        Expr::Unary { operator, right } => {
+            print!("({operator} ");
+            print_parse_results(*right);
+            print!(")");
+        }
+        Expr::Binary {
+            operator,
+            left,
+            right,
+        } => {
+            print!("({operator} ");
+            print_parse_results(*left);
             print!(" ");
+            print_parse_results(*right);
+            print!(")");
         }
     }
 }
