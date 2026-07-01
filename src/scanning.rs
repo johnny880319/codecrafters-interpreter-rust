@@ -177,7 +177,7 @@ impl Scanner<'_> {
             literal += ".0";
         }
 
-        while literal.ends_with("00") {
+        while literal.ends_with('0') && !literal.ends_with(".0") {
             literal.pop();
         }
 
