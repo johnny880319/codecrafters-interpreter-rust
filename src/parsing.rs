@@ -11,7 +11,43 @@ pub fn parse_expression(tokens: &[Token]) -> Result<AstNode> {
         return Err(anyhow::anyhow!("No tokens to parse"));
     }
     if tokens[tokens.len() - 1].kind == TokenType::Eof {
-        return parse_term(&tokens[..tokens.len() - 1]);
+        return parse_comparison(&tokens[..tokens.len() - 1]);
+    }
+    parse_comparison(tokens)
+}
+
+fn parse_comparison(tokens: &[Token]) -> Result<AstNode> {
+    if tokens.is_empty() {
+        return Err(anyhow::anyhow!("No tokens to parse"));
+    }
+
+    let mut parentheses_depth = 0;
+    let mut mid = tokens.len();
+
+    while mid > 0 {
+        mid -= 1;
+        match tokens[mid].kind {
+            TokenType::RightParen => {
+                parentheses_depth += 1;
+            }
+            TokenType::LeftParen => {
+                parentheses_depth -= 1;
+            }
+            TokenType::Less
+            | TokenType::LessEqual
+            | TokenType::Greater
+            | TokenType::GreaterEqual
+                if parentheses_depth == 0 =>
+            {
+                let left_node = parse_comparison(&tokens[0..mid])?;
+                let right_node = parse_term(&tokens[mid + 1..])?;
+                return Ok(AstNode {
+                    val: tokens[mid].lexeme.clone(),
+                    children: vec![left_node, right_node],
+                });
+            }
+            _ => {}
+        }
     }
     parse_term(tokens)
 }
