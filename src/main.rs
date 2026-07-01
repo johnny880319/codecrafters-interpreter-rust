@@ -38,11 +38,14 @@ fn main() {
                 eprintln!("Failed to scan tokens from file {filename}");
                 (Vec::new(), Vec::new())
             });
-            let (ast_nodes, _) = parsing::build_ast(&tokens, 0).unwrap_or_else(|_| {
-                eprintln!("Failed to build AST from tokens in file {filename}");
-                (Vec::new(), 0)
+            let ast_node = parsing::parse_expression(&tokens).unwrap_or_else(|e| {
+                eprintln!("Failed to build AST: {e}");
+                parsing::AstNode {
+                    val: String::new(),
+                    children: Vec::new(),
+                }
             });
-            print_parse_results(&ast_nodes);
+            print_parse_results(&[ast_node]);
         }
         _ => {
             eprintln!("Unknown command: {command}");
@@ -65,7 +68,7 @@ fn print_scan_results(tokens: &[Token], errors: &[ScanError]) {
 }
 
 fn print_parse_results(ast_nodes: &[AstNode]) {
-    for node in ast_nodes {
+    for (i, node) in ast_nodes.iter().enumerate() {
         if !node.children.is_empty() {
             print!("(");
         }
@@ -76,6 +79,9 @@ fn print_parse_results(ast_nodes: &[AstNode]) {
         print_parse_results(&node.children);
         if !node.children.is_empty() {
             print!(")");
+        }
+        if i < ast_nodes.len() - 1 {
+            print!(" ");
         }
     }
 }

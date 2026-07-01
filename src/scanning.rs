@@ -8,6 +8,7 @@ pub struct Scanner<'a> {
     errors: Vec<ScanError>,
 }
 
+#[derive(Debug)]
 pub struct Token {
     pub kind: TokenType,
     pub lexeme: String,
@@ -254,6 +255,7 @@ impl Scanner<'_> {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum TokenType {
     // Single-character tokens
     Comma,
